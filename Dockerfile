@@ -27,9 +27,9 @@ RUN make
 ENV LD_LIBRARY_PATH SEAL/bin:$LD_LIBRARY_PATH
 
 # Build SEAL C++ example
-COPY /SEALExamples /SEAL/SEALExamples
-WORKDIR /SEAL/SEALExamples
-RUN make
+# COPY /SEALExamples /SEAL/SEALExamples
+# WORKDIR /SEAL/SEALExamples
+# RUN make
 
 # Build SEAL Python wrapper
 COPY /SEALPython /SEAL/SEALPython
@@ -38,6 +38,7 @@ WORKDIR /SEAL/SEALPython
 RUN pip3 install --upgrade pip
 RUN pip3 install setuptools
 RUN pip3 install -r requirements.txt
+RUN pip3 install numpy
 RUN git clone https://github.com/pybind/pybind11.git
 WORKDIR /SEAL/SEALPython/pybind11
 RUN git checkout a303c6fc479662fd53eaa8990dbc65b7de9b7deb
