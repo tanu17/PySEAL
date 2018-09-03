@@ -432,18 +432,18 @@ print("\n[+] Proceding to homomorphic functions")
 # dimension of y -> vector of length n (number of individuals)
 # dimension of S ->  n (number of individuals) rows and m (number of SNPs)
 
-U1= matMultiply(tX_encrypted,y_encrypted)
+U1= matrixOperations.matMultiply(tX_encrypted,y_encrypted)
 print("calculated U1")
 # dimension of U1 ->  vector of length k+1 (1+ number of covariates)
 print("tX: "+str(len(tX_encrypted))+ "x"+str(tX_encrypted[0]))
 print("X: "+str(len(X))+ "x"+str(X[0]))
 
-cross_X= matMultiply(tX_encrypted,X)
+cross_X= matrixOperations.matMultiply(tX_encrypted,X)
 print("calculated cross_X")
 # dimension of cross_X ->  1+k rows and 1+k cols
 
 print("Size to inverse: ", len(cross_X))
-X_Star, determinant_X_star= inverseMatrix(cross_X)
+X_Star, determinant_X_star= matrixOperations.inverseMatrix(cross_X)
 # ^^^^ need to return determinant to user so that user can decrypt and return -1/D
 matrixOperations.multiplyDeterminant(X_Star, determinant_X_star)
 
