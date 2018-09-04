@@ -71,6 +71,9 @@ class matrixOperations:
 			cVec=Ciphertext()
 			evaluator.multiply(row[i], col[i], cVec)
 			evaluator.add(empty_ctext, cVec)
+			del(cVec)
+			print("Noise budget of ["+str(i)+"] :"+ str(decryptor.invariant_noise_budget(empty_ctext)))
+
 
 	@staticmethod
 	def matMultiply(T,K):
@@ -93,9 +96,13 @@ class matrixOperations:
 			tK=[list(tup) for tup in zip(*K)]
 			print("Dimension of T: %dx%d\nDimension of K: %dx%d"%(len(T),len(T[0]),len(K),len(K[0])))
 		del(K)
+		print("deleted K")
+
 		for i in range(len(T)):
 			x=[]
 			for j in range(rowK):
+				print(j)
+
 				temp=Ciphertext()
 				encryptor.encrypt(encoderF.encode(0), temp)
 				if (K_vector==1):
@@ -400,7 +407,6 @@ del(tX)
 gc.collect()
 
 X=[list(tup) for tup in zip(*tX_encrypted)]
-print("dimension of X: %d x %d"%(len(X),len(X[0])))
 
 #encrypting y
 y_encrypted=[]
@@ -411,7 +417,6 @@ for i in range(len(y)):
 del(y)
 
 k= len(X[0]) # k= 3
-
 
 
 ########################## linear regression Pt. 1 ##############################
@@ -425,8 +430,7 @@ print("\n[+] Proceding to homomorphic functions")
 U1= matrixOperations.matMultiply(tX_encrypted,y_encrypted)
 print("calculated U1")
 # dimension of U1 ->  vector of length k+1 (1+ number of covariates)
-print("tX: "+str(len(tX_encrypted))+ "x"+str(tX_encrypted[0]))
-print("X: "+str(len(X))+ "x"+str(X[0]))
+
 
 cross_X= matrixOperations.matMultiply(tX_encrypted,X)
 print("calculated cross_X")
