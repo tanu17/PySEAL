@@ -241,30 +241,15 @@ def print_value(s):
 	decryptor.decrypt(s,p)
 	print(encoderF.decode(p))
 
-
 def normalize(M):
-	for row in M:
-		sumTotal=0
-		count=0
-		for element in row:
-			try:
-				sumTotal+=int(element)
-				element=int(element)
-				count+=1
-			except:
-				continue
-		avg=sumTotal/count
-		for i in range(len(row)):
-			try:
-				row[i]=int(row[i])
-			except:
-				row[i]=avg
-		maxR=max(row)
-		minR=min(row)
-		for i in range(len(row)):
-			row[i]= (row[i] - minR) / avg
+	for i in range(len(M)):
+		maxR=max(M[i])
+		minR=min(M[i])
+		print(minR)
+		print(maxR)
+		for j in range(len(M[i])):
+			M[i][j]= (M[i][j] - minR) / float(maxR-minR)
 	return(M)
-
 
 def encode_Matrix(M):
 	row=len(M)
@@ -303,8 +288,6 @@ def decrypt_matrix(M):
 
 
 
-
-
 ########################## paramaters required #################################
 
 parms = EncryptionParameters()
@@ -322,7 +305,9 @@ encryptor = Encryptor(context, public_key)
 evaluator = Evaluator(context)
 decryptor = Decryptor(context, secret_key)
 
+
 ########################## encoding main matrix ################################
+
 
 dir_path=os.path.dirname(os.path.realpath(__file__))
 
@@ -366,30 +351,34 @@ for row in covariate.readlines():
 cov=cov[1:]
 cov_sum=[[0,0],[0,0],[0,0]]
 for i in range (len(cov)):
-	for j in range(1,4):
+	for j in range(2,5):
 		if cov[i][j]!="NA":
-			cov_sum[j-1][0]+=int(cov[i][j])
-			cov_sum[j-1][1]+=1
+			cov_sum[j-2][0]+=int(cov[i][j])
+			cov_sum[j-2][1]+=1.0
+
+print(cov_sum)
+for i in range(len(cov_sum)):
+	cov_sum[i]=cov_sum[i][0]/cov_sum[i][1]
+print(cov_sum)
 cov_new=[]
 for i in range(len(cov)):
 	cov_new_row=[]
-	for j in range(1,4):
+	for j in range(1,5):
 		if cov[i][j] =="NA":
-			cov_new_row.append(cov_sum[j-1][0]/cov_sum[j-1][1])
+			cov_new_row.append(cov_sum[j-2])
 		else:
 			cov_new_row.append(int(cov[i][j]))
 	cov_new.append(cov_new_row)
-cov=cov_new
 
+Tcov= [list(tup) for tup in zip(*cov_new)]
 del(cov_new)
 gc.collect()
-
-Tcov= [list(tup) for tup in zip(*cov)]
 y= Tcov[0]
 rawX0= Tcov[1:4]
 
-normalize(rawX0)
+rawX0=normalize(rawX0)
 # have to find a way to make normalize an encrytped function
+
 tX=[[1]*245]+ rawX0
 
 ###################### encrypting tX and y #####################################
@@ -411,6 +400,7 @@ del(tX)
 gc.collect()
 
 X=[list(tup) for tup in zip(*tX_encrypted)]
+print("dimension of X: %d x %d"%(len(X),len(X[0])))
 
 #encrypting y
 y_encrypted=[]
