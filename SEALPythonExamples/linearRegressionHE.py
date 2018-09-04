@@ -72,7 +72,7 @@ class matrixOperations:
 			evaluator.multiply(row[i], col[i], cVec)
 			evaluator.add(empty_ctext, cVec)
 			del(cVec)
-			print("Noise budget of ["+str(i)+"] :"+ str(decryptor.invariant_noise_budget(empty_ctext)))
+		print("Noise budget of ["+str(i)+"] :"+ str(decryptor.invariant_noise_budget(empty_ctext)))
 
 
 	@staticmethod
@@ -106,12 +106,13 @@ class matrixOperations:
 				temp=Ciphertext()
 				encryptor.encrypt(encoderF.encode(0), temp)
 				if (K_vector==1):
-					matrixOperations.dot_vector(T[i], tK, temp)
+					matrixOperations.dot_vector(T[i], tK, temp)a
 				elif(T_vector==1):
 					matrixOperations.dot_vector(T, tK[j], temp)
 				else:
 					matrixOperations.dot_vector(T[i], tK[j], temp)
 				x.append(temp)
+				del(temp)
 			X.append(x)
 		return(X)
 
