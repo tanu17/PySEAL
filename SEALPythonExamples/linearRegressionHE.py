@@ -1,4 +1,3 @@
-# First test for parallel processing
 import random
 import math
 import os
@@ -93,8 +92,15 @@ class matrixOperations:
 
 			print("Dimension of T: %dx%d\nDimension of K: %dx1"%(len(T),len(T[0]),len(K)))
 
-			for i in range(len(T)):
-				X.append( matrixOperations.dot_vector(T[i], K) )
+			output = multiprocessing.Queue()
+			processes = [multiprocessing.Process(target=matrixOperations.dot_vector, args=(T[i],K, j, output)) for i in range(len(T))]
+			for p in processes:
+				p.start()
+			for p in processes:
+				p.join()
+			results = [output.get() for p in processes]
+		    results.sort()
+			X = [r[1] for r in results]
 
 		elif (type(T[0]) != list ):
 			# K is a vector instead of matrix
@@ -112,7 +118,6 @@ class matrixOperations:
 			del(K)
 
 			for i in range(len(T)):
-				print(i)
 				output = multiprocessing.Queue()
 				processes = [multiprocessing.Process(target=matrixOperations.dot_vector, args=(T[i],tK[j], j, output)) for j in range(rowK)]
 				for p in processes:
@@ -120,7 +125,7 @@ class matrixOperations:
 				for p in processes:
 					p.join()
 				results = [output.get() for p in processes]
-				results.sort()
+			    results.sort()
 				results = [r[1] for r in results]
 				X.append( results )
 
