@@ -1,3 +1,4 @@
+# First test for parallel processing
 import random
 import math
 import os
@@ -5,6 +6,7 @@ import numpy
 import time
 import seal
 import gc
+import multiprocessing 
 try:
     import cPickle as pickle
 except ModuleNotFoundError:
@@ -62,8 +64,10 @@ class matrixEncryptRows:
 class matrixOperations:
 
 	@staticmethod
-	def dot_vector(row,col,empty_ctext):
-	#returns dot vector between two vectors
+	def dot_vector(row,col, pos=0 , output=None):
+		#returns dot vector between two vectors
+		empty_ctext=Ciphertext()
+		encryptor.encrypt(encoderF.encode(0), empty_ctext)
 		l=len(row)
 		for i in range(l):
 			# multiply/binary operation between vectors
@@ -72,7 +76,10 @@ class matrixOperations:
 			evaluator.multiply(row[i], col[i], cVec)
 			evaluator.add(empty_ctext, cVec)
 			del(cVec)
-		print("Noise budget:"+ str(decryptor.invariant_noise_budget(empty_ctext)))
+		if(output==None):
+			return(empty_ctext)
+		else:
+			output.put((pos, empty_ctext))
 
 
 	@staticmethod
@@ -80,40 +87,43 @@ class matrixOperations:
 	# multipliess two matrix and returns a new matrix as result
 		X=[]
 		rowK=len(K)
-		K_vector=0
-		T_vector=0
-		if (type(K[0]) != list ):
-			tK=K
+
+		if ( type(K[0]) != list ):
+			# K is a vector instead of matrix
+
 			print("Dimension of T: %dx%d\nDimension of K: %dx1"%(len(T),len(T[0]),len(K)))
-			K_vector=1
+
+			for i in range(len(T)):
+				X.append( matrixOperations.dot_vector(T[i], K) )
 
 		elif (type(T[0]) != list ):
+			# K is a vector instead of matrix
+
 			tK=[list(tup) for tup in zip(*K)]
 			print("Dimension of T: %dx1\nDimension of K: %dx%d"%(len(T),len(K),len(K[0])))
-			T_vector=1
+			del(K)
+
+			for i in range(len(tK)):
+				X.append( matrixOperations.dot_vector(tK[i], T) )
 
 		else:
 			tK=[list(tup) for tup in zip(*K)]
 			print("Dimension of T: %dx%d\nDimension of K: %dx%d"%(len(T),len(T[0]),len(K),len(K[0])))
-		del(K)
-		print("deleted K")
+			del(K)
 
-		for i in range(len(T)):
-			x=[]
-			for j in range(rowK):
-				print(j)
+			for i in range(len(T)):
+				print(i)
+				output = multiprocessing.Queue()
+				processes = [multiprocessing.Process(target=matrixOperations.dot_vector, args=(T[i],tK[j], j, output)) for j in range(rowK)]
+				for p in processes:
+					p.start()
+				for p in processes:
+					p.join()
+				results = [output.get() for p in processes]
+				results.sort()
+				results = [r[1] for r in results]
+				X.append( results )
 
-				temp=Ciphertext()
-				encryptor.encrypt(encoderF.encode(0), temp)
-				if (K_vector==1):
-					matrixOperations.dot_vector(T[i], tK, temp)
-				elif(T_vector==1):
-					matrixOperations.dot_vector(T, tK[j], temp)
-				else:
-					matrixOperations.dot_vector(T[i], tK[j], temp)
-				x.append(temp)
-				del(temp)
-			X.append(x)
 		return(X)
 
 	@staticmethod
@@ -253,6 +263,8 @@ def normalize(M):
 	for i in range(len(M)):
 		maxR=max(M[i])
 		minR=min(M[i])
+		print(minR)
+		print(maxR)
 		for j in range(len(M[i])):
 			M[i][j]= (M[i][j] - minR) / float(maxR-minR)
 	return(M)
@@ -294,216 +306,221 @@ def decrypt_matrix(M):
 
 
 
-########################## paramaters required #################################
-
-parms = EncryptionParameters()
-parms.set_poly_modulus("1x^8192 + 1")
-parms.set_coeff_modulus(seal.coeff_modulus_128(8192))
-parms.set_plain_modulus(1 << 21)
-context = SEALContext(parms)
-
-encoderF = FractionalEncoder(context.plain_modulus(), context.poly_modulus(), 30, 34, 3) 
-keygen = KeyGenerator(context)
-public_key = keygen.public_key()
-secret_key = keygen.secret_key()
-
-encryptor = Encryptor(context, public_key)
-evaluator = Evaluator(context)
-decryptor = Decryptor(context, secret_key)
+if __name__ == '__main__':
 
 
-########################## encoding main matrix ################################
+	########################## paramaters required #################################
+
+	parms = EncryptionParameters()
+	parms.set_poly_modulus("1x^8192 + 1")
+	parms.set_coeff_modulus(seal.coeff_modulus_128(8192))
+	parms.set_plain_modulus(1 << 21)
+	context = SEALContext(parms)
+
+	encoderF = FractionalEncoder(context.plain_modulus(), context.poly_modulus(), 30, 34, 3) 
+	keygen = KeyGenerator(context)
+	public_key = keygen.public_key()
+	secret_key = keygen.secret_key()
+
+	encryptor = Encryptor(context, public_key)
+	evaluator = Evaluator(context)
+	decryptor = Decryptor(context, secret_key)
 
 
-dir_path=os.path.dirname(os.path.realpath(__file__))
-
-snp = open(dir_path+"/snpMat.txt","r+")
-S=[]
-for row in snp.readlines():
-	S.append(row.strip().split())
-S=S[1:]
-S = numpy.array(S).astype(numpy.float)
-S.tolist()
-
-n= len(S) # n=245
-m= len(S[0])# m=10643
-
-S_encoded=encode_Matrix(S)
-del(S)
-gc.collect()
-print("[+] matrix has been encoded")
-
-########################### encrypting S #######################################
+	########################## encoding main matrix ################################
 
 
-tS_encoded=[list(tup) for tup in zip(*S_encoded)]
-del(S_encoded)
-for i in range(0,4,2):
-	a= matrixEncryptRows(i, tS_encoded[i:i+2])
-#	del(a)
-#gc.collect()
-del(a)
-print("matrix saved, need to be recovered")
-S_encRECON=[]
-reconstructMatrix()
+	dir_path=os.path.dirname(os.path.realpath(__file__))
 
-#################### covariate matrix and derivatives ##########################
+	snp = open(dir_path+"/snpMat.txt","r+")
+	S=[]
+	for row in snp.readlines():
+		S.append(row.strip().split())
+	S=S[1:]
+	S = numpy.array(S).astype(numpy.float)
+	S.tolist()
 
-covariate= open(dir_path+"/covariates.csv")
-# appending with average in data where NA is there
-cov=[]
-for row in covariate.readlines():
-	cov.append(row.strip().split(","))
-cov=cov[1:]
-cov_sum=[[0,0],[0,0],[0,0]]
-for i in range (len(cov)):
-	for j in range(2,5):
-		if cov[i][j]!="NA":
-			cov_sum[j-2][0]+=int(cov[i][j])
-			cov_sum[j-2][1]+=1.0
+	n= len(S) # n=245
+	m= len(S[0])# m=10643
 
-for i in range(len(cov_sum)):
-	cov_sum[i]=cov_sum[i][0]/cov_sum[i][1]
-cov_new=[]
-for i in range(len(cov)):
-	cov_new_row=[]
-	for j in range(1,5):
-		if cov[i][j] =="NA":
-			cov_new_row.append(cov_sum[j-2])
-		else:
-			cov_new_row.append(int(cov[i][j]))
-	cov_new.append(cov_new_row)
+	S_encoded=encode_Matrix(S)
+	del(S)
+	gc.collect()
+	print("[+] matrix has been encoded")
 
-Tcov= [list(tup) for tup in zip(*cov_new)]
-del(cov_new)
-gc.collect()
-y= Tcov[0]
-rawX0= Tcov[1:4]
+	########################### encrypting S #######################################
 
-rawX0=normalize(rawX0)
-# have to find a way to make normalize an encrytped function
 
-tX=[[1]*245]+ rawX0
+	tS_encoded=[list(tup) for tup in zip(*S_encoded)]
+	del(S_encoded)
+	for i in range(0,4,2):
+		a= matrixEncryptRows(i, tS_encoded[i:i+2])
+	#	del(a)
+	#gc.collect()
+	del(a)
+	print("matrix saved, need to be recovered")
+	S_encRECON=[]
+	reconstructMatrix()
 
-###################### encrypting tX and y #####################################
+	#################### covariate matrix and derivatives ##########################
 
-row_tX=len(tX) #row_tX= 3
-col_tX=len(tX[0]) #col_tX= 245
+	covariate= open(dir_path+"/covariates.csv")
+	# appending with average in data where NA is there
+	cov=[]
+	for row in covariate.readlines():
+		cov.append(row.strip().split(","))
+	cov=cov[1:]
+	cov_sum=[[0,0],[0,0],[0,0]]
+	for i in range (len(cov)):
+		for j in range(2,5):
+			if cov[i][j]!="NA":
+				cov_sum[j-2][0]+=int(cov[i][j])
+				cov_sum[j-2][1]+=1.0
 
-# encrypting matrix tX
-tX_encrypted=[]
-for i in range(row_tX):
-	tx_enc=[]
-	for j in range(col_tX):
+	print(cov_sum)
+	for i in range(len(cov_sum)):
+		cov_sum[i]=cov_sum[i][0]/cov_sum[i][1]
+	print(cov_sum)
+	cov_new=[]
+	for i in range(len(cov)):
+		cov_new_row=[]
+		for j in range(1,5):
+			if cov[i][j] =="NA":
+				cov_new_row.append(cov_sum[j-2])
+			else:
+				cov_new_row.append(int(cov[i][j]))
+		cov_new.append(cov_new_row)
+
+	Tcov= [list(tup) for tup in zip(*cov_new)]
+	del(cov_new)
+	gc.collect()
+	y= Tcov[0]
+	rawX0= Tcov[1:4]
+
+	rawX0=normalize(rawX0)
+	# have to find a way to make normalize an encrytped function
+
+	tX=[[1]*245]+ rawX0
+
+	###################### encrypting tX and y #####################################
+
+	row_tX=len(tX) #row_tX= 3
+	col_tX=len(tX[0]) #col_tX= 245
+
+	# encrypting matrix tX
+	tX_encrypted=[]
+	for i in range(row_tX):
+		tx_enc=[]
+		for j in range(col_tX):
+			temp=Ciphertext()
+			encryptor.encrypt(encoderF.encode(tX[i][j]), temp)
+			tx_enc.append(temp)
+		tX_encrypted.append(tx_enc)
+
+	del(tX)
+	gc.collect()
+
+	X=[list(tup) for tup in zip(*tX_encrypted)]
+
+	#encrypting y
+	y_encrypted=[]
+	for i in range(len(y)):
 		temp=Ciphertext()
-		encryptor.encrypt(encoderF.encode(tX[i][j]), temp)
-		tx_enc.append(temp)
-	tX_encrypted.append(tx_enc)
+		encryptor.encrypt(encoderF.encode(int(y[i])), temp)
+		y_encrypted.append(temp)
+	del(y)
 
-del(tX)
-gc.collect()
-
-X=[list(tup) for tup in zip(*tX_encrypted)]
-
-#encrypting y
-y_encrypted=[]
-for i in range(len(y)):
-	temp=Ciphertext()
-	encryptor.encrypt(encoderF.encode(int(y[i])), temp)
-	y_encrypted.append(temp)
-del(y)
-
-k= len(X[0]) # k= 3
+	k= len(X[0]) # k= 3
 
 
-########################## linear regression Pt. 1 ##############################
+	########################## linear regression Pt. 1 ##############################
 
-print("\n[+] Proceding to homomorphic functions")
+	print("\n[+] Proceding to homomorphic functions")
 
-# dimension of X ->  n (number of individuals) rows and 1+k (1+ number of covariates) cols
-# dimension of y -> vector of length n (number of individuals)
-# dimension of S ->  n (number of individuals) rows and m (number of SNPs)
+	# dimension of X ->  n (number of individuals) rows and 1+k (1+ number of covariates) cols
+	# dimension of y -> vector of length n (number of individuals)
+	# dimension of S ->  n (number of individuals) rows and m (number of SNPs)
 
-U1= matrixOperations.matMultiply(tX_encrypted,y_encrypted)
-print("calculated U1")
-# dimension of U1 ->  vector of length k+1 (1+ number of covariates)
-
-
-cross_X= matrixOperations.matMultiply(tX_encrypted,X)
-print("calculated cross_X")
-# dimension of cross_X ->  1+k rows and 1+k cols
-
-print("Size to inverse: ", len(cross_X))
-X_Star, determinant_X_star= matrixOperations.inverseMatrix(cross_X)
-# ^^^^ need to return determinant to user so that user can decrypt and return -1/D
-matrixOperations.multiplyDeterminant(X_Star, determinant_X_star)
-
-U2=matMultiply(X_Star, U1) 
-del(U1)
-print("calculated U2")
-# dimension of U2 ->  vector of length k+1 (1+ number of covariates)
-
-intermediateYStar=matrixOperations.matMultiply(X, U2)
-# dimension of intermediateYStar ->  vector of length n (number of individuals)
-# not returning new matrix after subtraction as the original matrix has to be deleted
-y_star= matrixOperations.subtractMatrix(y,intermediateYStar)
-del(U2)
-del(intermediateYStar)
-# dimension of y_star -> vector of length n (number of individuals)
-
-U3= matrixOperations.matMultiply(tX_encrypted,S)
-# dimension of U3 -> 1+k rows and m (number of SNPs)
-U4= matrixOperations.matMultiply(X_Star, U3)
-del(U3)
-# dimension of U4 -> 1+k rows and m (number of SNPs)
+	U1= matrixOperations.matMultiply(tX_encrypted,y_encrypted)
+	print("calculated U1")
+	# dimension of U1 ->  vector of length k+1 (1+ number of covariates)
 
 
-S_star_temp=matrixOperations.matMultiply(X,U4)
-del(U4)
-S_star=matrixOperations.subtractMatrix(S,S_star_temp)
-del(S_star_temp)
-# dimension of S_star -> n (number of individuals) rows and m (number of SNPs)
+	cross_X= matrixOperations.matMultiply(tX_encrypted,X)
+	print("calculated cross_X")
+	# dimension of cross_X ->  1+k rows and 1+k cols
 
-tY_star= [list(tup) for tup in zip(*y_star)]
-b_temp= matrixOperations.matMultiply(tY_star, S_star)
-# dimension of b_temp -> vector of length m (number of SNPs)
-del(tY_star)
+	print("Size to inverse: ", len(cross_X))
+	X_Star, determinant_X_star= matrixOperations.inverseMatrix(cross_X)
+	# ^^^^ need to return determinant to user so that user can decrypt and return -1/D
+	matrixOperations.multiplyDeterminant(X_Star, determinant_X_star)
 
-for elementY in y_star:
-	evaluator.square(elementY)
-y_star2=y_star
-del(y_star)
+	U2=matMultiply(X_Star, U1) 
+	del(U1)
+	print("calculated U2")
+	# dimension of U2 ->  vector of length k+1 (1+ number of covariates)
 
-S_star2=matrixOperations.colSquare_Sum(S_star)
-# dimension of S_star2 -> vector of length m (number of SNPs)
+	intermediateYStar=matrixOperations.matMultiply(X, U2)
+	# dimension of intermediateYStar ->  vector of length n (number of individuals)
+	# not returning new matrix after subtraction as the original matrix has to be deleted
+	y_star= matrixOperations.subtractMatrix(y,intermediateYStar)
+	del(U2)
+	del(intermediateYStar) 
+	# dimension of y_star -> vector of length n (number of individuals)
+
+	U3= matrixOperations.matMultiply(tX_encrypted,S)
+	# dimension of U3 -> 1+k rows and m (number of SNPs)
+	U4= matrixOperations.matMultiply(X_Star, U3)
+	del(U3)
+	# dimension of U4 -> 1+k rows and m (number of SNPs)
 
 
-########################## linear regression Pt. 2 ##############################
-######## after returning some matrix to decrypt and to evaluate by user #########
+	S_star_temp=matrixOperations.matMultiply(X,U4)
+	del(U4)
+	S_star=matrixOperations.subtractMatrix(S,S_star_temp)
+	del(S_star_temp)
+	# dimension of S_star -> n (number of individuals) rows and m (number of SNPs)
+
+	tY_star= [list(tup) for tup in zip(*y_star)]
+	b_temp= matrixOperations.matMultiply(tY_star, S_star)
+	# dimension of b_temp -> vector of length m (number of SNPs)
+	del(tY_star)
+
+	for elementY in y_star:
+		evaluator.square(elementY)
+	y_star2=y_star
+	del(y_star)
+
+	S_star2=matrixOperations.colSquare_Sum(S_star)
+	# dimension of S_star2 -> vector of length m (number of SNPs)
 
 
-b_temp_dec= decrypt_matrix(b_temp)
-S_star2_dec= decrypt_matrix(S_star2)
-y_star2_dec= decrypt_matrix(y_star2)
+	########################## linear regression Pt. 2 ##############################
+	######## after returning some matrix to decrypt and to evaluate by user #########
 
-del(b_temp)
-del(S_star2)
-del(y_star2)
 
-b=numpy.divide(b_temp, S_star2)
-# dimension of b -> vector of length m (number of SNPs)
+	b_temp_dec= decrypt_matrix(b_temp)
+	S_star2_dec= decrypt_matrix(S_star2)
+	y_star2_dec= decrypt_matrix(y_star2)
 
-b2= numpy.square(b)
-sig = numpy.subtract(numpy.sum(y_star2_dec),numpy.multiply(b2,S_star2_dec)) / (n-k-2)
+	del(b_temp)
+	del(S_star2)
+	del(y_star2)
 
-err= numpy.sqrt(sig*(1/S_star2_dec))
+	b=numpy.divide(b_temp, S_star2)
+	# dimension of b -> vector of length m (number of SNPs)
 
-f=numpy.divide(b,err)
-f=-abs(f)
-p=[]
-for x in f:
-	p.append( 1 - (norm(0, 1).cdf(x)) )
-logp= -numpy.log10(p)
-logp.tolist()
+	b2= numpy.square(b)
+	sig = numpy.subtract(numpy.sum(y_star2_dec),numpy.multiply(b2,S_star2_dec)) / (n-k-2)
 
-print(len(logp))
+	err= numpy.sqrt(sig*(1/S_star2_dec))
+
+	f=numpy.divide(b,err)
+	f=-abs(f)
+	p=[]
+	for x in f:
+		p.append( 1 - (norm(0, 1).cdf(x)) )
+	logp= -numpy.log10(p)
+	logp.tolist()
+
+	print(len(logp))
