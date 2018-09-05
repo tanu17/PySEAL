@@ -78,6 +78,7 @@ class matrixOperations:
 		if(output==None):
 			return(empty_ctext)
 		else:
+			print(pos)
 			output.put((pos, empty_ctext))
 
 
@@ -93,7 +94,7 @@ class matrixOperations:
 			print("Dimension of T: %dx%d\nDimension of K: %dx1"%(len(T),len(T[0]),len(K)))
 
 			output = multiprocessing.Queue()
-			processes = [multiprocessing.Process(target=matrixOperations.dot_vector, args=(T[i],K, j, output)) for i in range(len(T))]
+			processes = [multiprocessing.Process(target=matrixOperations.dot_vector, args=(T[i],K, i, output)) for i in range(len(T))]
 			for p in processes:
 				p.start()
 			for p in processes:
@@ -268,8 +269,6 @@ def normalize(M):
 	for i in range(len(M)):
 		maxR=max(M[i])
 		minR=min(M[i])
-		print(minR)
-		print(maxR)
 		for j in range(len(M[i])):
 			M[i][j]= (M[i][j] - minR) / float(maxR-minR)
 	return(M)
@@ -382,10 +381,8 @@ if __name__ == '__main__':
 				cov_sum[j-2][0]+=int(cov[i][j])
 				cov_sum[j-2][1]+=1.0
 
-	print(cov_sum)
 	for i in range(len(cov_sum)):
 		cov_sum[i]=cov_sum[i][0]/cov_sum[i][1]
-	print(cov_sum)
 	cov_new=[]
 	for i in range(len(cov)):
 		cov_new_row=[]
