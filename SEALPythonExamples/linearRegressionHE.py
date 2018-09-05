@@ -99,7 +99,7 @@ class matrixOperations:
 			for p in processes:
 				p.join()
 			results = [output.get() for p in processes]
-		    results.sort()
+			results.sort()
 			X = [r[1] for r in results]
 
 		elif (type(T[0]) != list ):
@@ -125,7 +125,7 @@ class matrixOperations:
 				for p in processes:
 					p.join()
 				results = [output.get() for p in processes]
-			    results.sort()
+				results.sort()
 				results = [r[1] for r in results]
 				X.append( results )
 
