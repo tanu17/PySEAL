@@ -65,7 +65,7 @@ class matrixOperations:
 	@staticmethod
 	def parallel_Multiplication(element1,element2, pos=0, outputMul=None):
 		temp=Ciphertext()
-		evaluator.multiply(row[i], col[i], temp)
+		evaluator.multiply(element1, element2, temp)
 		if(outputMul==None):
 			return(temp)
 		else:
@@ -79,6 +79,7 @@ class matrixOperations:
 		processes1 = [multiprocessing.Process(target=matrixOperations.parallel_Multiplication, args=(row[i],col[i], i, output)) for i in range(len(row))]
 		for p in processes1:
 			p.start()
+			print("dot_vector pos: %d"%(pos))
 		for p in processes1:
 			p.join()
 		results = [outputMul.get() for p in processes1]
@@ -91,7 +92,6 @@ class matrixOperations:
 			return(empty_ctext)
 		else:
 			output.put((pos, empty_ctext))
-			print("dot_vector pos: %d"%(pos))
 
 
 	@staticmethod
@@ -110,6 +110,7 @@ class matrixOperations:
 			for p in processes:
 				p.start()
 			for p in processes:
+				print("P in matMultiply: ")
 				p.join()
 			results = [output.get() for p in processes]
 			print("Results gathered")
@@ -363,7 +364,7 @@ if __name__ == '__main__':
 	S_encoded=encode_Matrix(S)
 	del(S)
 	gc.collect()
-	print("[+] matrix has been encoded")
+	print("\n[+] matrix has been encoded")
 
 	########################### encrypting S #######################################
 
