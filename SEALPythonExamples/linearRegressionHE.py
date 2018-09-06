@@ -69,8 +69,8 @@ class matrixOperations:
 		if(outputMul==None):
 			return(temp)
 		else:
-			outputMul.put((pos, temp))
 			print(pos)
+			outputMul.put((pos, temp))
 
 	@staticmethod
 	def dot_vector(row,col, pos=0 , output=None):
@@ -79,9 +79,10 @@ class matrixOperations:
 		processes1 = [multiprocessing.Process(target=matrixOperations.parallel_Multiplication, args=(row[i],col[i], i, output)) for i in range(len(row))]
 		for p in processes1:
 			p.start()
-			print("dot_vector pos: %d"%(pos))
+			print(p)
 		for p in processes1:
 			p.join()
+			print(p)
 		results = [outputMul.get() for p in processes1]
 		results.sort()
 		X = [r[1] for r in results]
