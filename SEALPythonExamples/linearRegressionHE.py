@@ -87,11 +87,9 @@ class matrixOperations:
 		X = [r[1] for r in results]
 		empty_ctext=Ciphertext()
 		evaluator.add_many(X,empty_ctext)
+		print("added_many success")
 		del(X)
-		if(output==None):
-			return(empty_ctext)
-		else:
-			output.put((pos, empty_ctext))
+		return(empty_ctext)
 
 
 	@staticmethod
@@ -104,9 +102,12 @@ class matrixOperations:
 			# K is a vector instead of matrix
 
 			print("Dimension of T: %dx%d\nDimension of K: %dx1"%(len(T),len(T[0]),len(K)))
-
-			output = multiprocessing.Queue()
-			processes = [multiprocessing.Process(target=matrixOperations.dot_vector, args=(T[i],K, i, output)) for i in range(len(T))]
+			for i in range(len(T)):
+				print("------> matMultiply { i }: ",i)
+				X.append(matrixOperations.dot_vector(T[i], K))
+			#output = multiprocessing.Queue()
+			#processes = [multiprocessing.Process(target=matrixOperations.dot_vector, args=(T[i],K, i, output)) for i in range(len(T))]
+			"""
 			for p in processes:
 				p.start()
 			for p in processes:
@@ -116,6 +117,8 @@ class matrixOperations:
 			print("Results gathered")
 			results.sort()
 			X = [r[1] for r in results]
+			"""
+			return(X)
 
 		elif (type(T[0]) != list ):
 			# K is a vector instead of matrix
