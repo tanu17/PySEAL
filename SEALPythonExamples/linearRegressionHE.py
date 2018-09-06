@@ -63,23 +63,35 @@ class matrixEncryptRows:
 class matrixOperations:
 
 	@staticmethod
+	def parallel_Multiplication(element1,element2, pos=0, outputMul=None):
+		temp=Ciphertext()
+		evaluator.multiply(row[i], col[i], temp)
+		if(outputMul==None):
+			return(temp)
+		else:
+			outputMul.put((pos, temp))
+			print(pos)
+
+	@staticmethod
 	def dot_vector(row,col, pos=0 , output=None):
-		#returns dot vector between two vectors
+	#returns dot vector between two vectors
+		outputMul = multiprocessing.Queue()
+		processes1 = [multiprocessing.Process(target=matrixOperations.parallel_Multiplication, args=(row[i],col[i], i, output)) for i in range(len(row))]
+		for p in processes1:
+			p.start()
+		for p in processes1:
+			p.join()
+		results = [outputMul.get() for p in processes1]
+		results.sort()
+		X = [r[1] for r in results]
 		empty_ctext=Ciphertext()
-		encryptor.encrypt(encoderF.encode(0), empty_ctext)
-		l=len(row)
-		for i in range(l):
-			# multiply/binary operation between vectors
-			# can define new dot-vector operation(linear algebra) here
-			cVec=Ciphertext()
-			evaluator.multiply(row[i], col[i], cVec)
-			evaluator.add(empty_ctext, cVec)
-			del(cVec)
+		evaluator.add_many(X,empty_ctext)
+		del(X)
 		if(output==None):
 			return(empty_ctext)
 		else:
-			print(pos)
 			output.put((pos, empty_ctext))
+			print("dot_vector pos: %d"%(pos))
 
 
 	@staticmethod
@@ -100,6 +112,7 @@ class matrixOperations:
 			for p in processes:
 				p.join()
 			results = [output.get() for p in processes]
+			print("Results gathered")
 			results.sort()
 			X = [r[1] for r in results]
 
