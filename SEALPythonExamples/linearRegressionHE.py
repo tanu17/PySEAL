@@ -86,6 +86,7 @@ class matrixOperations:
 		results = [outputMul.get() for p in processes1]
 		results.sort()
 		X = [r[1] for r in results]
+		print(x)
 		empty_ctext=Ciphertext()
 		evaluator.add_many(X,empty_ctext)
 		print("added_many success")
@@ -440,7 +441,7 @@ if __name__ == '__main__':
 	del(tX)
 	gc.collect()
 
-	X=[list(tup) for tup in zip(*tX_encrypted)]
+	#X=[list(tup) for tup in zip(*tX_encrypted)]
 
 	#encrypting y
 	y_encrypted=[]
@@ -461,8 +462,18 @@ if __name__ == '__main__':
 	# dimension of y -> vector of length n (number of individuals)
 	# dimension of S ->  n (number of individuals) rows and m (number of SNPs)
 
+
+	#restricting to 10 for calculation  purposes
+	y_encrypted=y_encrypted[:10]
+	for j in range(len(U1)):
+		tX_encrypted[j]=tX_encrypted[j][:10]
+
+	X=[list(tup) for tup in zip(*tX_encrypted)]
+
+
 	U1= matrixOperations.matMultiply(tX_encrypted,y_encrypted)
 	print("calculated U1")
+	print(U1)
 	# dimension of U1 ->  vector of length k+1 (1+ number of covariates)
 
 
