@@ -92,7 +92,7 @@ class matrixOperations:
 				X.append(matrixOperations.dot_vector(T[i], K))
 
 
-		elif (type(T[0]) != list ):
+		elif ( type(T[0]) != list ):
 			# T is a vector instead of matrix
 			tK=[list(tup) for tup in zip(*K)]
 			#print("Dimension of T: %dx1\nDimension of K: %dx%d\n"%(len(T),len(K),len(K[0])))
@@ -172,6 +172,7 @@ class matrixOperations:
 			for element in (tM[i]):
 				y=Ciphertext()
 				evaluator.square(element,y)
+#~~~~~~~~~~~~~ can have need to relinearize or changing parameter ~~~~~~~~~~
 				evaluator.add(x,y)
 			del(y)
 			X.append(x)
@@ -186,6 +187,7 @@ class matrixOperations:
 		trace_vector=[matrixOperations.trace(K)]
 
 		for i in range(1,n):
+#~~~~~~~~~~~~~ can have need to relinearize or changing parameter ~~~~~~~~~~
 			matrixPower_vector+=[matrixOperations.matMultiply(K, matrixPower_vector[i-1])]
 			trace_vector+=[matrixOperations.trace(matrixPower_vector[i])]
 
