@@ -82,6 +82,7 @@ class matrixOperations:
 		empty_ctext=Ciphertext()
 		evaluator.add_many(D,empty_ctext)
 		del(D)
+		pool.close()
 		return(empty_ctext)
 
 
@@ -332,7 +333,7 @@ def encrypting_Matrix(M):
 		for i in range(len(M)):
 			enc_M.append(Enc_pool.map(parallel_encryption, M[i]))
 	del(M)
-	del(Enc_pool)
+	Enc_pool.close()
 	return(enc_M)
 
 if __name__ == '__main__':
@@ -356,7 +357,7 @@ if __name__ == '__main__':
 	evaluator = Evaluator(context)
 	decryptor = Decryptor(context, secret_key)
 
-	num_cores = multiprocessing.cpu_count()
+	num_cores = multiprocessing.cpu_count() -5 
 
 
 	########################## encoding main matrix ################################
@@ -459,17 +460,18 @@ if __name__ == '__main__':
 	del(S)
 
 	for i in range(0,4,2):
-		a= matrixEncryptRows(i, tS[i:i+2])
+		#a= matrixEncryptRows(tS[i:i+2])
 		#del(a)
-	del(a)
-	print("[+] Matrix saved. Will be recovered later")
+		S_enc+=encrypting_Matrix(tS[i:i+2])
+	#del(a)
+	print("[+] Matrix S encrytped")
 	#reconstructMatrix()
 	#gc.collect()
-	if (S_encRECON==[]):
-		S_encRECON=S_enc
+	"""if (S_encRECON==[]):
+		S_encRECON=S_enc"""
 	#print(S_enc)
-	print(len(S_encRECON))
-	print(len(S_encRECON[0]))
+	print(len(S_enc))
+	print(len(S_enc[0]))
 
 
 	########################## linear regression Pt. 1 ##############################
@@ -522,7 +524,7 @@ if __name__ == '__main__':
 	# dimension of y_star -> vector of length n (number of individuals)
 	del(intermediateYStar)
 
-	U3= matrixOperations.matMultiply(tX_encrypted,S_encRECON)
+	U3= matrixOperations.matMultiply(tX_encrypted,S_enc)
 	# dimension of U3 -> 1+k rows and m (number of SNPs)
 	print("[+] Calculated U3")
 	U4= matrixOperations.matMultiply(X_Star, U3)
@@ -533,14 +535,14 @@ if __name__ == '__main__':
 
 	S_star_temp=matrixOperations.matMultiply(X,U4)
 	del(U4)
-	matrixOperations.subtractMatrix(S_encRECON,S_star_temp)
+	matrixOperations.subtractMatrix(S_enc,S_star_temp)
 	del(S_star_temp)
 	print("[+] Calculated S*")
 	print(S_star)
 	# dimension of S_star -> n (number of individuals) rows and m (number of SNPs)
 
 	tY_star= [list(tup) for tup in zip(*y_encrypted)]
-	b_temp= matrixOperations.matMultiply(tY_star, S_encRECON)
+	b_temp= matrixOperations.matMultiply(tY_star, S_enc)
 	# dimension of b_temp -> vector of length m (number of SNPs)
 	del(tY_star)
 
