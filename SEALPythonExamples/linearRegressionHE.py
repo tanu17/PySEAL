@@ -26,8 +26,8 @@ from seal import ChooserEvaluator,     \
                  Plaintext,            \
                  SEALContext,          \
                  EvaluationKeys,       \
-#                 GaloisKeys,           \
-#                 PolyCRTBuilder,       \
+                 GaloisKeys,           \
+                 PolyCRTBuilder,       \
                  ChooserEncoder,       \
                  ChooserEvaluator,     \
                  ChooserPoly
@@ -47,14 +47,20 @@ class matrixEncryptRows:
 		self.ncol= len(encodedRows[0])
 		self.encrypt_matrix_row(encodedRows)
 		self.X=[]
-		#print("Created matrixEncryptRows object")
+		print("Created matrixEncryptRows object")
 
 	def encrypt_matrix_row(self,encodedRows):
+		global S_enc
 		self.X=encrypting_Matrix(encodedRows)
+		S_enc+=(self.X)
+		#print(self.X)
 
+"""
 	def __del__(self):
 		with open(str(self.i)+'.matrix', 'wb') as f:
-			pickle.dump(self,f)
+			print(self.i)
+			pickle.dump(self.X,f)
+"""
 
 ########################## matrixOperations ######################################
 
@@ -126,7 +132,6 @@ class matrixOperations:
 	@staticmethod
 	def trace(M):
 	# calculates trace of a matrix 
-		print(M)
 		t=Ciphertext(M[0][0])
 		for i in range(1,len(M)):
 			evaluator.add(t,M[i][i])
@@ -281,19 +286,22 @@ def encode_Matrix(row):
 		x.append(encoderF.encode(element))
 	return(x)
 
+"""
 def reconstructMatrix():
 #^^^^^^^^^^^^^^^^Need to parallelize reconstruction
 	global S_encRECON
 	for i in range(0,4,2):
 		target=str(i)+'.matrix'
 		if os.path.getsize(target)>0:
-			with open(target, 'rb') as f:
+			with open(target, 'rb') as file:
 				print("opened")
-				row2=pickle.load(f)
-				S_encRECON+=row2.X
-				f.close()
+				row2=pickle.load(file)
+				print(row2)
+				S_encRECON+=row2
+				file.close()
 		else:
 			print("[-] Error occured while reconstructing matrix")
+"""
 
 def decrypt_matrix(M):
 	M_dec=[]
@@ -309,7 +317,7 @@ def decrypt_matrix(M):
 
 def parallel_encryption(element):
 	temp=Ciphertext()
-	encryptor.encrypt(encoderF.encode(element, temp))
+	encryptor.encrypt(encoderF.encode(element), temp)
 	return(temp)
 
 def encrypting_Matrix(M):
@@ -322,10 +330,10 @@ def encrypting_Matrix(M):
 
 	else:
 		for i in range(len(M)):
-			X.append(Enc_pool.map(parallel_encryption, M[i]))
+			enc_M.append(Enc_pool.map(parallel_encryption, M[i]))
 	del(M)
 	del(Enc_pool)
-	return(X)
+	return(enc_M)
 
 if __name__ == '__main__':
 
@@ -368,13 +376,13 @@ if __name__ == '__main__':
 	m= len(S[0])# m=10643
 
 	#encodiing matrix parallely
-	pool = multiprocessing.Pool(processes=num_cores)
-	S_encoded= pool.map(encode_Matrix, S)
+	#pool = multiprocessing.Pool(processes=num_cores)
+	#S_encoded= pool.map(encode_Matrix, S)
 
-	del(S)
-	del(pool)
+	#del(S)
+	#del(pool)
 	gc.collect()
-	print("\n[+] Matrix S has been encoded")
+	#print("\n[+] Matrix S has been encoded")
 
 
 	#################### covariate matrix and derivatives ##########################
@@ -418,7 +426,7 @@ if __name__ == '__main__':
 	del(rawX0)
 
 	###################### encrypting tX and y #####################################
-
+	print("[+] Starting enrypting matrices")
 	row_tX=len(tX) #row_tX= 3
 	col_tX=len(tX[0]) #col_tX= 245
 
@@ -440,20 +448,28 @@ if __name__ == '__main__':
 	except:
 		pass
 
+	print("[+] Encrypted tX and y")
+
 	########################### encrypting S #######################################
 
+	tS=[list(tup) for tup in zip(*S)]
+	S_encRECON=[]
+	S_enc=[]
 
-	tS_encoded=[list(tup) for tup in zip(*S_encoded)]
-	del(S_encoded)
+	del(S)
 
 	for i in range(0,4,2):
-		a= matrixEncryptRows(i, tS_encoded[i:i+2])
+		a= matrixEncryptRows(i, tS[i:i+2])
 		#del(a)
 	del(a)
 	print("[+] Matrix saved. Will be recovered later")
-	S_encRECON=[]
-	reconstructMatrix()
+	#reconstructMatrix()
 	#gc.collect()
+	if (S_encRECON==[]):
+		S_encRECON=S_enc
+	#print(S_enc)
+	print(len(S_encRECON))
+	print(len(S_encRECON[0]))
 
 
 	########################## linear regression Pt. 1 ##############################
@@ -489,8 +505,11 @@ if __name__ == '__main__':
 	X_Star, determinant_X_star= matrixOperations.inverseMatrix(cross_X)
 	# ^^^^ need to return determinant to user so that user can decrypt and return -1/D
 	matrixOperations.multiplyDeterminant(X_Star, determinant_X_star)
+	print("[+] Calculated inverse")
 
-	U2=matMultiply(X_Star, U1) 
+	gc.collect()
+
+	U2=matrixOperations.matMultiply(X_Star, U1) 
 	del(U1)
 	print("[+] Calculated U2")
 	# dimension of U2 ->  vector of length k+1 (1+ number of covariates)
@@ -498,12 +517,12 @@ if __name__ == '__main__':
 	intermediateYStar=matrixOperations.matMultiply(X, U2)
 	# dimension of intermediateYStar ->  vector of length n (number of individuals)
 	# not returning new matrix after subtraction as the original matrix has to be deleted
-	y_star= matrixOperations.subtractMatrix(y,intermediateYStar)
-	del(U2)
-	del(intermediateYStar) 
+	matrixOperations.subtractMatrix(y_encrypted,intermediateYStar)
+	print("[+] Calculated Y*")
 	# dimension of y_star -> vector of length n (number of individuals)
+	del(intermediateYStar)
 
-	U3= matrixOperations.matMultiply(tX_encrypted,S)
+	U3= matrixOperations.matMultiply(tX_encrypted,S_encRECON)
 	# dimension of U3 -> 1+k rows and m (number of SNPs)
 	print("[+] Calculated U3")
 	U4= matrixOperations.matMultiply(X_Star, U3)
@@ -514,12 +533,14 @@ if __name__ == '__main__':
 
 	S_star_temp=matrixOperations.matMultiply(X,U4)
 	del(U4)
-	S_star=matrixOperations.subtractMatrix(S,S_star_temp)
+	matrixOperations.subtractMatrix(S_encRECON,S_star_temp)
 	del(S_star_temp)
+	print("[+] Calculated S*")
+	print(S_star)
 	# dimension of S_star -> n (number of individuals) rows and m (number of SNPs)
 
-	tY_star= [list(tup) for tup in zip(*y_star)]
-	b_temp= matrixOperations.matMultiply(tY_star, S_star)
+	tY_star= [list(tup) for tup in zip(*y_encrypted)]
+	b_temp= matrixOperations.matMultiply(tY_star, S_encRECON)
 	# dimension of b_temp -> vector of length m (number of SNPs)
 	del(tY_star)
 
