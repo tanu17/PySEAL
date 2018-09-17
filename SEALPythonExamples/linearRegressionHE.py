@@ -41,6 +41,7 @@ from seal import ChooserEvaluator,     \
 class matrixOperations:
 
 	@staticmethod
+	# returns dot vector of two vectors by successive multiplication and final addition, faster than one-by-one addition
 	def dot_vector(row,col):
 		D=[]
 		for i in range(len(row)):
@@ -72,27 +73,26 @@ class matrixOperations:
 	"""
 
 	@staticmethod
-	def matMultiply(T,K):
 	# multipliess two matrix and returns a new matrix as result
+	def matMultiply(T,K):
 		X=[]
 		Mul_pool= multiprocessing.Pool(processes=num_cores)
 
+		# K is a vector
 		if ( type(K[0]) != list ):
-			# K is a vector
 			#print("Dimension of T: %dx%d\nDimension of K: %dx1"%(len(T),len(T[0]),len(K)))
 			X= Mul_pool.starmap(matrixOperations.dot_vector, zip(T, itertools.repeat(K)))
 
+		# T is a vector
 		elif ( type(T[0]) != list ):
-			# T is a vector
-			tK=[list(tup) for tup in zip(*K)]
 			#print("Dimension of T: %dx1\nDimension of K: %dx%d\n"%(len(T),len(K),len(K[0])))
+			tK=[list(tup) for tup in zip(*K)]
 			X= Mul_pool.starmap(matrixOperations.dot_vector, zip(itertools.repeat(T), tK))
 			del(tK)
 
 		else:
-			print("Dimension of T: %dx%d  Dimension of K: %dx%d"%(len(T),len(T[0]),len(K),len(K[0])))
+			#print("Dimension of T: %dx%d  Dimension of K: %dx%d"%(len(T),len(T[0]),len(K),len(K[0])))
 			tK=[list(tup) for tup in zip(*K)]
-
 			for i in range(len(T)):
 				row_x = Mul_pool.starmap(matrixOperations.dot_vector, zip(itertools.repeat(T[i]), tK))
 				X.append( row_x )
@@ -103,16 +103,16 @@ class matrixOperations:
 
 
 	@staticmethod
-	def multScaler(s, L):
 	# multiplies a matrix L with a scaler s, changes the same matrix
+	def multScaler(s, L):
 		for x in L:
 			for y in x:
 				evaluator.multiply(y,s)
 
 
 	@staticmethod
-	def trace(M):
 	# calculates trace of a matrix 
+	def trace(M):
 		t=Ciphertext(M[0][0])
 		for i in range(1,len(M)):
 			evaluator.add(t,M[i][i])
@@ -135,16 +135,18 @@ class matrixOperations:
 			X.append(x)
 		return(X)
 
+
 	@staticmethod
 	def parallel_subtraction(element1,element2):
 		evaluator.sub(element1,element2)
 		return(element1)
 
+
 	@staticmethod
+	# subtracts the first matrix by second matrix, the result are returned in new matrix
 	def subtractMatrix(T,K):
 		Sub_pool = multiprocessing.Pool(processes=num_cores)
 		X=[]
-		# subtract the first matrix bt second matrix, the result are overridden in the first matrix itself
 		if ( type(T[0]) != list):
 			X=Sub_pool.starmap(matrixOperations.parallel_subtraction, zip(T,K))
 		else:
@@ -155,13 +157,14 @@ class matrixOperations:
 		#Sub_pool.join()
 		return(X)
 
+
 	@staticmethod
+	# returns sums of squares of each element in a column of a matrix. Returns a vector with length equal to number of columns in a matrix
 	def colSquare_Sum(M):
-		# returns sums of squares of each element in a column of a matrix. Returns a vector with length ewual to number of columns in a matrix
 		tM = [list(tup) for tup in zip(*M)]
 		# last step for finding p values, hance can delete the original matrix
 		del(M)
-		X=[] 
+		X=[]
 		rowM=len(tM)
 		for i in range(rowM):
 			x=Ciphertext()
@@ -213,7 +216,7 @@ class matrixOperations:
 
 		K_inv=[]
 		# creating null matrix of size n*n
-		# can be parallelized
+#~~~~~~~~~~~~~ can be parallelized
 		for i in range(n):
 			k_i=[]
 			for j in range(n):
@@ -232,7 +235,7 @@ class matrixOperations:
 							evaluator.add(K_inv[t][s],matrixPower_vector[i][t][s])
 
 		determinant= c[n]
-		# have to multiply K_inv with 
+		# have to multiply K_inv with (-1/determinant) as -k_inv * determinant is returned
 		return(K_inv, determinant)
 
 
@@ -259,11 +262,13 @@ class matrixOperations:
 		return(X)
 
 
+
+
 ########################## rest of functions neeeded ###########################
 
 
 def print_plain(D):
-    # function to print out all elements in a matrix
+    # function to print out all elements in a matrix/vector
     D_new= decrypt_matrix(D)
     for row in D_new:
     	print(row)
@@ -337,7 +342,7 @@ if __name__ == '__main__':
 	parms = EncryptionParameters()
 	parms.set_poly_modulus("1x^16384 + 1")
 	parms.set_coeff_modulus(seal.coeff_modulus_128(16384))
-	parms.set_plain_modulus(1 << 18)
+	parms.set_plain_modulus(1 << 16)
 	context = SEALContext(parms)
 
 	encoderF = FractionalEncoder(context.plain_modulus(), context.poly_modulus(), 30, 34, 3) 
@@ -352,8 +357,7 @@ if __name__ == '__main__':
 	num_cores = multiprocessing.cpu_count() 
 
 
-	########################## encoding main matrix ################################
-
+	########################## processing main matrix ################################
 
 	t1 = time.time()
 
@@ -372,7 +376,7 @@ if __name__ == '__main__':
 
 	gc.collect()
 
-	#################### covariate matrix and derivatives ##########################
+	################ processing covariate matrix and derivatives ######################
 
 	covariate= open(dir_path+"/covariates.csv")
 	# appending with average in data where NA is there
@@ -410,7 +414,6 @@ if __name__ == '__main__':
 	# have to find a way to make normalize an encrytped function
 
 	tX=[[1]*245]+ rawX0
-	del(rawX0)
 
 	###################### encrypting tX and y #####################################
 	print("[+] Starting enrypting matrices")
@@ -421,6 +424,7 @@ if __name__ == '__main__':
 
 	tX_encrypted= encrypting_Matrix(tX)
 	try:
+		del(rawX0)
 		del(tX)
 	except:
 		pass
@@ -433,10 +437,9 @@ if __name__ == '__main__':
 	y_encrypted= encrypting_Matrix(y)
 	try:
 		del(y)
+		del(tX_encrypted)
 	except:
 		pass
-
-	gc.collect()
 
 
 	print("[+] Encrypted y")
@@ -452,14 +455,14 @@ if __name__ == '__main__':
 	#for i in range(0,,2):
 		#a= matrixEncryptRows(tS[i:i+2])
 		#del(a)
-	S_enc=encrypting_Matrix(tS[0:10])
+	S_enc=encrypting_Matrix(tS[0:8 ])
 	#del(a)
 	print("[+] Matrix S encrytped")
 	S_enc=[list(tup) for tup in zip(*S_enc)]
 	########################## linear regression Pt. 1 ##############################
 
 	print('Time cost: {} seconds'.format(time.time()-t1))
-
+	gc.collect()
 	t2 = time.time()
 
 	print("\n[+] Proceding to homomorphic functions")
@@ -474,8 +477,6 @@ if __name__ == '__main__':
 	U1= matrixOperations.matMultiply(tX_encrypted,y_encrypted)
 	print("Noise budget of U1[2]:"+ str(decryptor.invariant_noise_budget(U1[2])))
 	print("[+] Calculated U1")
-	print_plain(U1)
-	print()
 	# dimension of U1 ->  vector of length k+1 (1+ number of covariates)
 	"""
 	U1= encrypting_Matrix([ 108.0 ,42.37975927,44.43704984,52.77309281])
@@ -484,8 +485,6 @@ if __name__ == '__main__':
 	cross_X= matrixOperations.matMultiply(tX_encrypted,X)
 	print("Noise budget of cross_X[1][1]:"+ str(decryptor.invariant_noise_budget(cross_X[1][1])))
 	print("[+] Calculated cross_X")
-	print_plain(cross_X)
-	print()
 	# dimension of cross_X ->  1+k rows and 1+k cols
 	"""
 	cross_X= encrypting_Matrix( [[ 245.0,91.26565954,95.24248535,118.42642904],[  91.26565954 ,39.67640403 ,35.41864926,43.98636322] ,[  95.24248535 ,35.41864926 ,41.46235818 ,48.28531555],[ 118.42642904,43.98636322,48.28531555 ,61.48756469]])
@@ -493,12 +492,9 @@ if __name__ == '__main__':
 	"""
 	print("{=} Size to inverse: ", len(cross_X))
 	X_Star, determinant_X_star= matrixOperations.inverseMatrix(cross_X)
-	# ^^^^ need to return determinant to user so that user can decrypt and return -1/D
 	X_star=matrixOperations.multiplyDeterminant(X_Star, determinant_X_star)
 	print("Noise budget of X_Star[1][1]:"+ str(decryptor.invariant_noise_budget(X_Star[1][1])))
 	print("[+] Calculated inverse")
-	print_plain(X_Star)
-	print()
 	"""
 
 	X_Star= encrypting_Matrix( [[ 0.09094401, -0.06817554 ,-0.04070801 ,-0.09442204],[-0.06817554,  0.17621681, -0.00043033,  0.00558531],[-0.04070801, -0.00043033,  0.30799719, -0.16315345],[-0.09442204,  0.00558531, -0.16315345,  0.32224894]])
@@ -507,66 +503,60 @@ if __name__ == '__main__':
 	"""
 	U2=matrixOperations.matMultiply(X_Star, U1) 
 	print("Noise budget of U2[1]:"+ str(decryptor.invariant_noise_budget(U2[1])))
-	#del(U1)
 	print("[+] Calculated U2")
 	# dimension of U2 ->  vector of length k+1 (1+ number of covariates)
 	"""
+	del(U1)
 
 	U2= encrypting_Matrix([ 0.14080326, 0.38069974, 0.6616717, -0.20486026])
 
 	intermediateYStar=matrixOperations.matMultiply(X, U2)
+	del(U2)
 	# dimension of intermediateYStar ->  vector of length n (number of individuals)
 	# not returning new matrix after subtraction as the original matrix has to be deleted
 	y_star=matrixOperations.subtractMatrix(y_encrypted,intermediateYStar)
 	print("Noise budget of Y*[3]:"+ str(decryptor.invariant_noise_budget(y_encrypted[3])))
 	print("Noise budget of Y*[3]:"+ str(decryptor.invariant_noise_budget(y_star[3])))
-	print_plain(y_star)
-	print("\n[+] Calculated Y*\n")
+	print("[+] Calculated Y*\n")
 	# dimension of y_star -> vector of length n (number of individuals)
 	del(intermediateYStar)
+	gc.collect()
 
-	# variable to make budget print
-	U3= matrixOperations.matMultiply(tX_encrypted,S_enc)
+
+	U3= matrixOperations.matMultiply([list(tup) for tup in zip(*X)],S_enc)
 	# dimension of U3 -> 1+k rows and m (number of SNPs)
 	print("Noise budget of U3[1][3]:"+ str(decryptor.invariant_noise_budget(U3[1][3])))
-	print_plain(U3)
-	print("\n[+] Calculated U3\n")
+	print("[+] Calculated U3\n")
 
 	U4= matrixOperations.matMultiply(X_Star, U3)
 	del(U3)
 	print("Noise budget of U4[1][3]:"+ str(decryptor.invariant_noise_budget(U4[1][3])))
-	print_plain(U4)
-	print("\n[+] Calculated U4\n")
+	print("[+] Calculated U4\n")
 	# dimension of U4 -> 1+k rows and m (number of SNPs)
 
 	gc.collect()
 	S_star_temp=matrixOperations.matMultiply(X,U4)
 	del(U4)
 	print("Noise budget of S_star_temp[1][3]:"+ str(decryptor.invariant_noise_budget(S_star_temp[1][3])))
-	print("\n[+] Calculated S_star_temp\n")
 	S_star=matrixOperations.subtractMatrix(S_enc,S_star_temp)
-	print("Noise budget of S*[1][3]:"+ str(decryptor.invariant_noise_budget(S_enc[1][3])))
+	try:
+		# S-enc should be deleted first
+		del(S_enc)
+		del(S_star_temp)
+	except:
+		pass
 	print("Noise budget of S*[1][3]:"+ str(decryptor.invariant_noise_budget(S_star[1][3])))
-	print_plain(S_star)
-	del(S_star_temp)
-	print("\n[+] Calculated S*\n")
+	print("[+] Calculated S*\n")
 
 	# dimension of S_star -> n (number of individuals) rows and m (number of SNPs)
 
-	#tY_star= [list(tup) for tup in zip(*y_encrypted)]
-	b_temp= matrixOperations.matMultiply(y_star, S_star)
+	b_temp= matrixOperations.matMultiply(S_star,y_star)
 	# dimension of b_temp -> vector of length m (number of SNPs)
-	#del(tY_star)
-	"""
-	for elementY in y_encrypted:
-		evaluator.square(elementY)
 
-	y_star2=y_encrypted
-	del(y_encrypted)
-	"""
 	print("^"*30)
 	print_plain(b_temp)
 	S_star2=matrixOperations.colSquare_Sum(S_star)
+	del(S_star)
 	# dimension of S_star2 -> vector of length m (number of SNPs)
 
 	print("[=] Finished with homomorphic functions")
