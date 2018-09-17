@@ -583,7 +583,7 @@ if __name__ == '__main__':
 
 	b_temp_dec= decrypt_matrix(b_temp)
 	S_star2_dec= decrypt_matrix(S_star2)
-	y_str= decrypt_matrix(y_encrypted)
+	y_str= decrypt_matrix(y_star)
 
 	y_star2_dec= numpy.square(y_str)
 
@@ -591,7 +591,7 @@ if __name__ == '__main__':
 	try:
 		del(b_temp)
 		del(S_star2)
-		del(y_encrypted)
+		del(y_star)
 	except:
 		pass
 
