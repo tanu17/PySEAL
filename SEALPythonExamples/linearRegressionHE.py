@@ -157,7 +157,7 @@ class matrixOperations:
 	@staticmethod
 	def parallel_subtraction(element1,element2):
 		temp=Ciphertext()
-		evaluator.sub(element1,element2)
+		evaluator.sub(element1,element2,temp)
 		return(temp)
 
 
@@ -170,7 +170,6 @@ class matrixOperations:
 			X=Sub_pool.starmap(matrixOperations.parallel_subtraction, zip(T,K))
 		else:
 			for i in range(len(T)):
-				print("len zip",len(list(zip(T[i],K[i]))))
 				X.append(Sub_pool.starmap(matrixOperations.parallel_subtraction,zip(T[i],K[i])))
 		Sub_pool.close()
 		del(T)
