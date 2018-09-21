@@ -62,7 +62,6 @@ class matrixOperations:
 
 	"""
 	
-
 	@staticmethod
 	def dot_vector_Parallel(row,col):
 		pool = multiprocessing.Pool(processes=num_cores)
@@ -89,11 +88,20 @@ class matrixOperations:
 		elif ( type(T[0]) != list ):
 			#print("Dimension of T: %dx1\nDimension of K: %dx%d\n"%(len(T),len(K),len(K[0])))
 			tK=[list(tup) for tup in zip(*K)]
-			X= Mul_pool.starmap(matrixOperations.dot_vector, zip(itertools.repeat(T), tK))
+			try:
+				for i in range(0,len(tK),15):
+					X.append( Mul_pool.starmap(matrixOperations.dot_vector, zip(tK, itertools.repeat(T))) )
+			except:
+				#print("error occured")
+				for i in range(len(tK)):
+					D=Ciphertext()
+					row_x=Mul_pool.starmap(matrixOperations.parallel_Multiplication, zip(tK[i],T) )
+					evaluator.add_many(row_x,D)
+					X.append(D)
 			del(tK)
 
 		else:
-			print("Dimension of T: %dx%d  Dimension of K: %dx%d"%(len(T),len(T[0]),len(K),len(K[0])))
+			#print("Dimension of T: %dx%d  Dimension of K: %dx%d"%(len(T),len(T[0]),len(K),len(K[0])))
 			tK=[list(tup) for tup in zip(*K)]
 
 			if (len(T)<=len(T[0]) ):
@@ -117,10 +125,12 @@ class matrixOperations:
 
 	@staticmethod
 	# multiplies a matrix L with a scaler s, changes the same matrix
+#-------------------------->
 	def multScaler(s, L):
 		for x in L:
 			for y in x:
 				evaluator.multiply(y,s)
+#-------------------------->
 
 
 	@staticmethod
@@ -171,6 +181,11 @@ class matrixOperations:
 		#Sub_pool.join()
 		return(X)
 
+	@staticmethod
+	def parallelSquare(element):
+		temp=Ciphertext()
+		evaluator.square(element,temp)
+		return(temp)
 
 	@staticmethod
 	# returns sums of squares of each element in a column of a matrix. Returns a vector with length equal to number of columns in a matrix
@@ -182,29 +197,33 @@ class matrixOperations:
 		rowM=len(tM)
 		for i in range(rowM):
 			x=Ciphertext()
-			encryptor.encrypt(encoderF.encode(0),x)
 			for j in range(len(tM[i])):
-				y=Ciphertext()
+				#y=Ciphertext()
 				evaluator.square(tM[i][j])
 				#~~~~~~~~~~~~~ can have need to relinearize or changing parameter ~~~~~~~~~~
-				evaluator.add(x,tM[i][j])
-			del(y)
+
+			evaluator.add_many(tM[i],x)
+			#del(y)
 			X.append(x)
 		del(tM)
 		return(X)
 
 	@staticmethod
 	def subtractMatrix(T,K):
-		for i in range(len(T)):
-			for j in range(len(T[0])):
-				#print("\nNoise budget of T:"+ str(decryptor.invariant_noise_budget(T[i][j])))
-				evaluator.negate(K[i][j])
-				evaluator.add(K[i][j], T[i][j])
-				#print("Noise budget of T:"+ str(decryptor.invariant_noise_budget(T[i][j])))
-		for i in range(len(T)):
-			evaluator.negate(K[i][j])	
-			evaluator.add(K[i][j], T[i][j])
+		if ( type(K[0]) != list ):
+			for i in range(len(T)):
+				evaluator.negate(K[i])	
+				evaluator.add(K[i], T[i])
 
+		else:
+			for i in range(len(T)):
+				for j in range(len(T[0])):
+					#print("\nNoise budget of T:"+ str(decryptor.invariant_noise_budget(T[i][j])))
+					evaluator.negate(K[i][j])
+					evaluator.add(K[i][j], T[i][j])
+		return(K)
+				#print("Noise budget of T:"+ str(decryptor.invariant_noise_budget(T[i][j])))
+		
 
 	@staticmethod
 	def inverseMatrix(K):
@@ -264,12 +283,12 @@ class matrixOperations:
 		# have to multiply K_inv with (-1/determinant) as -k_inv * determinant is returned
 		return(K_inv, determinant)
 
-
 	@staticmethod
 	def parallel_plainMultiplication(element,D):
 		# have to create new ciphertext object as row X column multiplication of matrix enforces no change in matrix elements
 		evaluator.multiply_plain(element, D)
 		return(element)
+	
 
 	@staticmethod
 	def multiplyDeterminant(M, determinant):
@@ -278,16 +297,18 @@ class matrixOperations:
 		decryptor.decrypt(determinant, p)
 		d= (-1/encoderF.decode(p))
 		delta=encoderF.encode(d)
-		plainMul_pool = multiprocessing.Pool(processes=num_cores)
+		#plainMul_pool = multiprocessing.Pool(processes=num_cores)
 		del(p)
 		X=[]
 		for i in range(len(M)):
-			X.append(plainMul_pool.map(partial(matrixOperations.parallel_plainMultiplication,D= delta), M[i]))
-		plainMul_pool.close()
-		plainMul_pool.join()
+			x = []
+			for m in M[i]: 
+				x.append(matrixOperations.parallel_plainMultiplication(m, delta))
+			X.append(x)
+			#X.append(plainMul_pool.map(partial(parallel_plainMultiplication,D= delta), M[i]))
+		#plainMul_pool.close()
+		#plainMul_pool.join()
 		return(X)
-
-
 
 
 ########################## rest of functions neeeded ###########################
@@ -337,7 +358,6 @@ def decrypt_matrix(M):
 	else:
 		for i in range(len(M)):
 			M_dec.append(dec_Pool.map(parallel_decryption, M[i]))
-	del(M)
 	dec_Pool.close()
 	dec_Pool.join()
 	return(M_dec)
@@ -460,7 +480,7 @@ if __name__ == '__main__':
 	print("[+] Encrypted X")
 	
 	#encrypting y
-	y_encrypted= encrypting_Matrix(y)
+	#y_encrypted= encrypting_Matrix(y)
 	try:
 		del(y)
 	except:
@@ -498,10 +518,13 @@ if __name__ == '__main__':
 
 	k= len(X[0]) # k= 3
 	
-
-	U1= matrixOperations.matMultiply(tX_encrypted,y_encrypted)
+	"""
+#-------------------------->
+	U1= matrixOperations.matMultiply(tX_encrypted,y_encrypted)   
+#-------------------------->
 	print("Noise budget of U1[2]:"+ str(decryptor.invariant_noise_budget(U1[2])))
 	print("[+] Calculated U1")
+	print_plain(U1)
 	# dimension of U1 ->  vector of length k+1 (1+ number of covariates)
 	
 	#U1= encrypting_Matrix([ 108.0 ,42.37975927,44.43704984,52.77309281])
@@ -510,29 +533,40 @@ if __name__ == '__main__':
 	cross_X= matrixOperations.matMultiply(tX_encrypted,X)
 	print("Noise budget of cross_X[1][1]:"+ str(decryptor.invariant_noise_budget(cross_X[1][1])))
 	print("[+] Calculated cross_X")
+	print_plain(cross_X)
 	# dimension of cross_X ->  1+k rows and 1+k cols
 	
 	#cross_X= encrypting_Matrix( [[ 245.0,91.26565954,95.24248535,118.42642904],[  91.26565954 ,39.67640403 ,35.41864926,43.98636322] ,[  95.24248535 ,35.41864926 ,41.46235818 ,48.28531555],[ 118.42642904,43.98636322,48.28531555 ,61.48756469]])
+	"""
 
-	
+	U1= encrypting_Matrix([ 108.0 ,42.37975927,44.43704984,52.77309281])
+
+	cross_X= encrypting_Matrix( [[ 245.0,91.26565954,95.24248535,118.42642904],[  91.26565954 ,39.67640403 ,35.41864926,43.98636322] ,[  95.24248535 ,35.41864926 ,41.46235818 ,48.28531555],[ 118.42642904,43.98636322,48.28531555 ,61.48756469]])
+
+
+	"""
 	print("{=} Size to inverse: ", len(cross_X))
 	X_Star, determinant_X_star= matrixOperations.inverseMatrix(cross_X)
 	X_star=matrixOperations.multiplyDeterminant(X_Star, determinant_X_star)
-	print("Noise budget of X_Star[1][1]:"+ str(decryptor.invariant_noise_budget(X_Star[1][1])))
+	print("Noise budget of X_Star[1][1]:"+ str(decryptor.invariant_noise_budget(X_star[1][1])))
+	print_plain(X_star)
 	print("[+] Calculated inverse")
+	"""
 	
 
-	#X_Star= encrypting_Matrix( [[ 0.09094401, -0.06817554 ,-0.04070801 ,-0.09442204],[-0.06817554,  0.17621681, -0.00043033,  0.00558531],[-0.04070801, -0.00043033,  0.30799719, -0.16315345],[-0.09442204,  0.00558531, -0.16315345,  0.32224894]])
+	X_star= encrypting_Matrix( [[ 0.09094401, -0.06817554 ,-0.04070801 ,-0.09442204],[-0.06817554,  0.17621681, -0.00043033,  0.00558531],[-0.04070801, -0.00043033,  0.30799719, -0.16315345],[-0.09442204,  0.00558531, -0.16315345,  0.32224894]])
 	gc.collect()
 
-	
-	U2=matrixOperations.matMultiply(X_Star, U1) 
+	"""
+	U2=matrixOperations.matMultiply(X_star, U1) 
 	print("Noise budget of U2[1]:"+ str(decryptor.invariant_noise_budget(U2[1])))
 	print("[+] Calculated U2")
+	print_plain(U2)
 	# dimension of U2 ->  vector of length k+1 (1+ number of covariates)
 	del(U1)
-
-	#U2= encrypting_Matrix([ 0.14080326, 0.38069974, 0.6616717, -0.20486026])
+	"""
+	"""
+	U2= encrypting_Matrix([ 0.14080326, 0.38069974, 0.6616717, -0.20486026])
 
 	gc.collect()
 
@@ -540,15 +574,18 @@ if __name__ == '__main__':
 	del(U2)
 	# dimension of intermediateYStar ->  vector of length n (number of individuals)
 	# not returning new matrix after subtraction as the original matrix has to be deleted
-	matrixOperations.subtractMatrix(y_encrypted,intermediateYStar)
-	print("[+] Calculated Y*\n")
+	y_star=matrixOperations.subtractMatrix(y_encrypted,intermediateYStar)
+	print_plain(y_star)
+	print("[+] Calculated Y*\n")											
 	# dimension of y_star -> vector of length n (number of individuals)
-	del(intermediateYStar)
+	#del(intermediateYStar)
 	gc.collect()
-
+	"""
 	
 
-	#y_star= encrypting_Matrix([0.35244961556035204, -0.6685232662966591, 0.6460250710823819, -0.22237307630640818, -0.38000425087971523, -0.5135794625619862, -0.44081632653060954, -0.31407479447977626, -0.15114589058355418, 0.7423664738674352, 0.5097002348327617, -0.5011688244330854, -0.42614478879332474, -0.4516780521282963, 0.5647656402050558, -0.36607518056825583, 0.5244428347430783, -0.4622238015837592, -0.3581164535196925, -0.5199083034825683, -0.44081632653060954, 0.47344055813166663, -0.4020055268755631, -0.34735586465146856, -0.5982804721310234, -0.35715132545477263, -0.25616834354751883, -0.6402976238848513, -0.4295512563298162, -0.5124898270396354, -0.42552422270876833, 0.3767627153321387, 0.2813291951214921, -0.27841463856522775, -0.38052846442553784, -0.17833141726649196, 0.7403971106893749, -0.40560248540223287, -0.39807383344804764, 0.39377182964201884, -0.27865363700368523, 0.1049726840479942, -0.5141788782958636, 0.6292731987059209, 0.5031494448787311, -0.31024054262827816, 0.5479794872738253, -0.480350629642605, -0.3858851443525953, -0.2069275985027929, -0.36059900142196966, -0.14194513172548096, -0.5243922886825211, 0.40250080160346713, -0.2557113919686138, -0.5616943718918579, -0.4102554896148951, 0.4933298250497308, -0.2991341900376029, -0.4214992999935737, -0.43919413144907454, -0.43257005894472295, -0.38610309749304283, -0.4909967275298022, -0.24450528613531453, -0.39592271732204326, 0.3932355749293892, -0.48866886669405585, -0.3524116982035772, -0.3983137391790377, -0.5619645622846166, -0.33210508825513707, -0.5859672755781402, 0.6534023390946093, -0.2474091919769706, 0.5292922454766535, -0.4960059386207791, -0.40463565222368386, -0.5194041228895542, -0.6572511978178474, -0.7663385897089925, -0.3025830677468878, -0.47003977767993, 0.3252343055371705, 0.2976473676522119, -0.47857005234109373, -0.5349018379454807, -0.342032271189228, -0.3964881392985714, -0.4057985702963557, 0.48433769562412854, 0.57191392625523, 0.7366040672685823, 0.6688257592550133, -0.5291504601682336, -0.33030655425608424, 0.5213847433351999, -0.39872356679650256, -0.4953964013578285, -0.29641594682144123, -0.3038554685623841, 0.6467512007088443, -0.2751216496645615, 0.5793776070218691, 0.5200330393859791, 0.5846840743870181, 0.6514169388567413, 0.5237065835875429, 0.5179501975720937, 0.380902534820584, 0.3077301449453662, 0.5710661865036856, 0.7524542593987915, 0.3714000148216777, 0.7222333896695979, 0.424570351911434, 0.5933287349765398, 0.3839216244116944, 0.5023732844351114, 0.5057002670931272, 0.6371023050061824, 0.4584790977883699, 0.6033351159916865, 0.4281304174771725, 0.28720609270137143, 0.7717980510776854, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905])
+	y_star= encrypting_Matrix([0.35244961556035204, -0.6685232662966591, 0.6460250710823819, -0.22237307630640818, -0.38000425087971523, -0.5135794625619862, -0.44081632653060954, -0.31407479447977626, -0.15114589058355418, 0.7423664738674352, 0.5097002348327617, -0.5011688244330854, -0.42614478879332474, -0.4516780521282963, 0.5647656402050558, -0.36607518056825583, 0.5244428347430783, -0.4622238015837592, -0.3581164535196925, -0.5199083034825683, -0.44081632653060954, 0.47344055813166663, -0.4020055268755631, -0.34735586465146856, -0.5982804721310234, -0.35715132545477263, -0.25616834354751883, -0.6402976238848513, -0.4295512563298162, -0.5124898270396354, -0.42552422270876833, 0.3767627153321387, 0.2813291951214921, -0.27841463856522775, -0.38052846442553784, -0.17833141726649196, 0.7403971106893749, -0.40560248540223287, -0.39807383344804764, 0.39377182964201884, -0.27865363700368523, 0.1049726840479942, -0.5141788782958636, 0.6292731987059209, 0.5031494448787311, -0.31024054262827816, 0.5479794872738253, -0.480350629642605, -0.3858851443525953, -0.2069275985027929, -0.36059900142196966, -0.14194513172548096, -0.5243922886825211, 0.40250080160346713, -0.2557113919686138, -0.5616943718918579, -0.4102554896148951, 0.4933298250497308, -0.2991341900376029, -0.4214992999935737, -0.43919413144907454, -0.43257005894472295, -0.38610309749304283, -0.4909967275298022, -0.24450528613531453, -0.39592271732204326, 0.3932355749293892, -0.48866886669405585, -0.3524116982035772, -0.3983137391790377, -0.5619645622846166, -0.33210508825513707, -0.5859672755781402, 0.6534023390946093, -0.2474091919769706, 0.5292922454766535, -0.4960059386207791, -0.40463565222368386, -0.5194041228895542, -0.6572511978178474, -0.7663385897089925, -0.3025830677468878, -0.47003977767993, 0.3252343055371705, 0.2976473676522119, -0.47857005234109373, -0.5349018379454807, -0.342032271189228, -0.3964881392985714, -0.4057985702963557, 0.48433769562412854, 0.57191392625523, 0.7366040672685823, 0.6688257592550133, -0.5291504601682336, -0.33030655425608424, 0.5213847433351999, -0.39872356679650256, -0.4953964013578285, -0.29641594682144123, -0.3038554685623841, 0.6467512007088443, -0.2751216496645615, 0.5793776070218691, 0.5200330393859791, 0.5846840743870181, 0.6514169388567413, 0.5237065835875429, 0.5179501975720937, 0.380902534820584, 0.3077301449453662, 0.5710661865036856, 0.7524542593987915, 0.3714000148216777, 0.7222333896695979, 0.424570351911434, 0.5933287349765398, 0.3839216244116944, 0.5023732844351114, 0.5057002670931272, 0.6371023050061824, 0.4584790977883699, 0.6033351159916865, 0.4281304174771725, 0.28720609270137143, 0.7717980510776854, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, -0.44081632653060954, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905, 0.5591836734693905])
+
+	"""
  
 	print("Noise budget of S_enc:"+ str(decryptor.invariant_noise_budget(S_enc[1][0])))
 
@@ -556,44 +593,43 @@ if __name__ == '__main__':
 
 	# dimension of U3 -> 1+k rows and m (number of SNPs)
 	print("Noise budget of U3[1][3]:"+ str(decryptor.invariant_noise_budget(U3[1][0])))
-	print("\nNoise budget of S_enc:"+ str(decryptor.invariant_noise_budget(S_enc[1][0])))
 	print("\n[+] Calculated U3\n")
 
-	U4= matrixOperations.matMultiply(X_Star, U3)
+	U4= matrixOperations.matMultiply(X_star, U3)
 
 	print("Noise budget of U4[1][3]:"+ str(decryptor.invariant_noise_budget(U4[1][0])))
 	print("[+] Calculated U4\n")
 	# dimension of U4 -> 1+k rows and m (number of SNPs)
-	print("Noise budget of S_enc:"+ str(decryptor.invariant_noise_budget(S_enc[1][0])))
-
 	gc.collect()
+	"""
+	U3=encrypting_Matrix([[13.0, 63.0], [5.14222549742078, 23.027266028002927], [6.61115912801306, 25.20176702199174], [6.5564007824386, 29.95805259726147]])
+
+	U4= encrypting_Matrix( [[-0.05649772933806174, 0.30496216732123793], [0.05363917922356076, -0.08078739296752338], [0.43510200780394404, 0.29979968091538556], [-0.16460572311419996, -0.277778222970829]])
+
 	S_star_temp=matrixOperations.matMultiply(X,U4)
-
-
 	print("Noise budget of S_star_temp[1][3]:"+ str(decryptor.invariant_noise_budget(S_star_temp[1][0])))
 	#print_plain(S_enc)
 	print("Noise budget of S_enc:"+ str(decryptor.invariant_noise_budget(S_enc[1][0])))
-#wroking till here
-	matrixOperations.subtractMatrix(S_enc,S_star_temp)
-	
+	S_star=matrixOperations.subtractMatrix(S_star_temp,S_enc)
 	#print("Noise budget of S*[1][3]:"+ str(decryptor.invariant_noise_budget(S_star[1][0])))
 	print("[+] Calculated S*\n")
 
+	print_plain(S_star)
 	# dimension of S_star -> n (number of individuals) rows and m (number of SNPs)
-	print_plain(y_encrypted)
 	#print_plain(S_enc)
 
 	##print(len(y_star))
 	#print(len(S_enc))
 	#print(len(S_enc[0]))
-	b_temp= matrixOperations.matMultiply(y_encrypted,S_enc)
+	b_temp= matrixOperations.matMultiply(y_star,S_star)
 	# dimension of b_temp -> vector of length m (number of SNPs)
 
 	print("^"*30)
 	print_plain(b_temp)
-	S_star2=matrixOperations.colSquare_Sum(S_enc)
+	S_star2=matrixOperations.colSquare_Sum(S_star)
 	#del(S_star)
 	# dimension of S_star2 -> vector of length m (number of SNPs)
+	print_plain(S_star2)
 
 	print("[=] Finished with homomorphic functions")
 
@@ -607,9 +643,9 @@ if __name__ == '__main__':
 	gc.collect()
 	print("\n[+] User-end calculations started")
 
-	b_temp_dec= decrypt_matrix(b_temp)
-	S_star2_dec= decrypt_matrix(S_star2)
-	y_str= decrypt_matrix(y_encrypted)
+	b_temp_dec= numpy.asarray(decrypt_matrix(b_temp))
+	S_star2_dec= numpy.asarray(decrypt_matrix(S_star2))
+	y_str= numpy.asarray(decrypt_matrix(y_star))
 
 	y_star2_dec= numpy.square(y_str)
 
@@ -632,9 +668,14 @@ if __name__ == '__main__':
 	# dimension of b -> vector of length m (number of SNPs)
 
 	b2= numpy.square(b)
+
 	sig = numpy.subtract(numpy.sum(y_star2_dec),numpy.multiply(b2,S_star2_dec)) / (n-k-2)
 
-	err= numpy.sqrt(sig*(numpy.reciprocal(S_star2_dec)))
+	print(numpy.shape(sig))
+	print(numpy.shape(b2))
+	print(numpy.shape(S_star2_dec))
+
+	err= numpy.sqrt(sig*(1/S_star2_dec))
 
 	f=numpy.divide(b,err)
 	f=-abs(f)
